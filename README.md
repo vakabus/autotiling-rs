@@ -1,3 +1,5 @@
+> **NOTE:** Unless you know for sure, that you want this, check out [ammgws's original version](https://github.com/ammgws/autotiling-rs). This fork is just a personal customization of the original project.
+
 # autotiling-rs
 When used on sway (and possibly i3), this automatically alternates the container layout between horizontal and vertical for successive new containers.
 
