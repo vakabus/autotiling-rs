@@ -9,9 +9,7 @@ fn switch_splitting(conn: &mut Connection, ratio: f32) -> Result<(), String> {
     let focused_node = tree
         .find_focused_as_ref(|n| n.focused)
         .ok_or("Could not find the focused node")?;
-    let parent = tree
-        .find_focused_as_ref(|n| n.nodes.iter().any(|n| n.focused))
-        .ok_or("No parent")?;
+    let parent = get_parent(&tree, focused_node).ok_or("No parent")?;
 
     // check for special cases when we should not do anything
     if should_we_ignore_this_window(focused_node) {
@@ -19,9 +17,14 @@ fn switch_splitting(conn: &mut Connection, ratio: f32) -> Result<(), String> {
     }
 
     // if there is a single window in the workspace, always split horizontaly
-    if parent.node_type == NodeType::Workspace && parent.nodes.len() == 1 {
-        configure_layout(NodeLayout::SplitH, parent, conn);
-        return Ok(());
+    let mut current = parent;
+    while current.nodes.len() == 1 {
+        if current.node_type == NodeType::Workspace {
+            configure_layout(NodeLayout::SplitH, parent, conn);
+            return Ok(());
+        } else {
+            current = get_parent(&tree, current).unwrap();
+        }
     }
 
     let real_ratio = (focused_node.rect.height as f32) / (focused_node.rect.width as f32);
@@ -32,6 +35,37 @@ fn switch_splitting(conn: &mut Connection, ratio: f32) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/**
+ * Reimplementation of Node::find_focused_as_ref, that takes closure instead of a function ptr
+ */
+pub fn node_find_focused_as_ref<'a, F>(slf: &'a Node, predicate: F) -> Option<&'a Node>
+where
+    F: Fn(&Node) -> bool,
+{
+    if predicate(slf) {
+        return Some(slf);
+    }
+    if slf.focus.is_empty() {
+        return None;
+    }
+    let first = slf.focus[0];
+    for node in &slf.nodes {
+        if node.id == first {
+            return node_find_focused_as_ref(node, predicate);
+        }
+    }
+    for node in &slf.floating_nodes {
+        if node.id == first {
+            return node_find_focused_as_ref(node, predicate);
+        }
+    }
+    None
+}
+
+fn get_parent<'a>(tree: &'a Node, current: &'a Node) -> Option<&'a Node> {
+    node_find_focused_as_ref(tree, |n| n.nodes.iter().any(|nn| nn.id == current.id))
 }
 
 /**
